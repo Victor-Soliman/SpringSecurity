@@ -13,6 +13,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
+import java.util.concurrent.TimeUnit;
 
 import static com.example.SpringSecurity.security.ApplicationUserRole.*;
 
@@ -32,15 +36,18 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         http
 //                .csrf().disable()
+                .csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .and()
                 // we want to authorize request
                 .authorizeRequests()
                 // all the paths that matches this : permit there access
                 .antMatchers("/", "index", "/css/*", "/js/*")
                 .permitAll()
+
                 // this antMatchers will protect the path to be accessed just by Role = student
                 .antMatchers("/api/**").hasRole(STUDENT.name())
 
-                // this antMatchers is one way to give permission based authentication
+                // this antMatchers is one way to give permission based authentication ,(for management path)
 //                .antMatchers(HttpMethod.DELETE, "/management/api/**").hasAuthority(ApplicationUserPermission.COURSE_WRITE.getPermission())
 //                .antMatchers(HttpMethod.POST, "/management/api/**").hasAuthority(ApplicationUserPermission.COURSE_WRITE.getPermission())
 //                .antMatchers(HttpMethod.PUT, "/management/api/**").hasAuthority(ApplicationUserPermission.COURSE_WRITE.getPermission())
@@ -51,7 +58,34 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
                 .authenticated()
                 // the mecanism we will use for that is basic authentication
                 .and()
-                .httpBasic();
+
+//                .httpBasic()
+                .formLogin()
+
+//                .loginPage("/login")
+    //              .permitAll()  // for some reason this is not working
+                    .defaultSuccessUrl("/courses", true)
+                    .passwordParameter("password")
+                    .usernameParameter("username")
+
+                // remember me configuration
+                .and()
+                .rememberMe() // default to 2 weeks
+                    .tokenValiditySeconds((int) TimeUnit.DAYS.toSeconds(21))
+//                .tokenRepository() // in case you are using a DB ,instead of the line above
+                    .key("somthingverysecured")
+                    .rememberMeParameter("remember-me")
+
+                // logout configuration
+                .and()
+                .logout()
+                    .logoutUrl("/logout")
+                    .logoutRequestMatcher(new AntPathRequestMatcher("/logout","GET"))
+                    .clearAuthentication(true)
+                    .invalidateHttpSession(true)
+                    .deleteCookies("JSESSIONID", "remember-me")
+                    .logoutSuccessUrl("/login") // means that after you successfully loggedOut -> go back to logeIn
+        ;
     }
 
     @Override
